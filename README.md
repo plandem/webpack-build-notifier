@@ -124,6 +124,9 @@ A function called when the notification is clicked. By default it activates the 
 #### onTimeout
 A function called when the notification times out and is closed. Undefined by default.
 
+#### remote
+A valid URL to submit a notification instead of executing node-notifier. Suits for docker environment, e.g.: "http://host.docker.internal:12345". 
+
 TypeScript
 ----------
 This project is written in TypeScript, and type declarations are included. You can take advantage of this if your project's webpack configuration is also using TypeScript (e.g. `webpack.config.ts`).

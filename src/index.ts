@@ -8,6 +8,8 @@ import process from 'process';
 import os from 'os';
 import notifier from 'node-notifier';
 import stripAnsi from 'strip-ansi';
+import FormData from 'form-data';
+import fs from 'fs';
 import { exec, execFileSync } from 'child_process';
 import { Notification } from 'node-notifier/notifiers/notificationcenter';
 import { CompilationResult, Config, CompilationStatus } from './types';
@@ -33,6 +35,7 @@ export default class WebpackBuildNotifierPlugin {
   private suppressCompileStart: boolean = true;
   private activateTerminalOnError: boolean = false;
   private showDuration: boolean = false;
+  private remote?: string;
   private successIcon: string = path.join(DEFAULT_ICON_PATH, 'success.png');
   private warningIcon: string = path.join(DEFAULT_ICON_PATH, 'warning.png');
   private failureIcon: string = path.join(DEFAULT_ICON_PATH, 'failure.png');
@@ -161,17 +164,16 @@ export default class WebpackBuildNotifierPlugin {
 
     /* istanbul ignore else */
     if (notify) {
-      notifier.notify(
-        Object.assign(this.notifyOptions || {}, {
-          title,
-          sound,
-          icon,
-          appName: this.appName,
-          message: stripAnsi(msg),
-          contentImage: this.logo,
-          wait: !this.buildSuccessful
-        })
-      );
+      this.notify(Object.assign(this.notifyOptions || {}, {
+        title,
+        sound,
+        icon,
+        appName: this.appName,
+        message: stripAnsi(msg),
+        contentImage: this.logo,
+        wait: !this.buildSuccessful
+      }));
+
       /* istanbul ignore else */
       if (this.onComplete) {
         this.onComplete(results.compilation, compilationStatus);
@@ -190,7 +192,8 @@ export default class WebpackBuildNotifierPlugin {
     compiler: webpack.compiler.Compiler,
     callback: Function
   ): void => {
-    notifier.notify({
+
+    this.notify({
       appName: this.appName,
       title: this.title,
       message: 'Compilation started...',
@@ -198,12 +201,35 @@ export default class WebpackBuildNotifierPlugin {
       icon: this.compileIcon,
       sound: this.compilationSound
     } as Notification);
+
     /* istanbul ignore else */
     if (this.onCompileStart) {
       this.onCompileStart(compiler);
     }
     callback();
   };
+
+  private readonly notify = (notification: Notification): void => {
+    if (!this.remote) {
+      notifier.notify(notification);
+      return;
+    }
+
+    const form = new FormData();
+    form.append('title', notification.title);
+    form.append('message', notification.message);
+    form.append('sound', notification.sound);
+
+    if (notification.icon) {
+      form.append('icon', fs.createReadStream(notification.icon));
+    }
+
+    if (notification.contentImage) {
+      form.append('contentImage', fs.createReadStream(notification.contentImage));
+    }
+
+    form.submit(this.remote);
+  }
 
   private readonly registerSnoreToast = (): void => {
     // ensure the SnoreToast appId is registered, which is needed for Windows Toast notifications
